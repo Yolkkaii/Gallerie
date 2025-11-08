@@ -1,136 +1,182 @@
-from tkinter import *
-from tkinter import ttk
+import customtkinter as ctk
+from pathlib import Path
+from Widgets import *
+from Menu import *
+from PIL import Image, ImageTk, ImageOps, ImageEnhance, ImageFilter
 
-class Gallerie:
-    def __init__(self, root):
-        self.root = root
-        self.root.title("Photo Gallery Application")
-        self.root.geometry("800x600")
+class Gallerie(ctk.CTk):
+    def __init__(self):
+        #Initial setup
+        super().__init__()
+        ctk.set_appearance_mode("dark")
+        self.geometry('1000x600')
+        self.title("Gallerie")
+        self.minsize(800, 500)
+        self.init_parameters()
 
-        self.themes = {
-            "light": {
-                "bg": "#f0f0f0",
-                "card": "#ffffff",
-                "fg": "black",
-                "button_bg": "white",
-                "button_fg": "black"
-            },
-            "dark": {
-                "bg": "#1e1e1e",
-                "card": "#2a2a2a",
-                "fg": "white",
-                "button_bg": "#3a3a3a",
-                "button_fg": "white"
-            }
+
+        #Program layout
+        self.rowconfigure(0, weight = 1)
+        self.columnconfigure(0, weight = 2, uniform = 'a')
+        self.columnconfigure(1, weight = 6, uniform = 'a')
+
+        #Canvas data
+        self.image_width = 0
+        self.image_height = 0
+        self.canvas_width = 0
+        self.canvas_height = 0
+
+        # Create and pack the menu
+        self.main_menu = MainMenu(
+            master=self,
+            on_import=self.handle_import,
+            on_edit=self.handle_edit,
+            on_gallery=self.handle_gallery,
+            on_exit=self.handle_exit
+        )
+
+        #Run program
+        self.mainloop()
+
+    def init_parameters(self):
+        self.pos_vars = {
+            'rotate': ctk.DoubleVar(value = ROTATE_DEFAULT),
+            'zoom': ctk.DoubleVar(value = ZOOM_DEFAULT),
+            'flip': ctk.StringVar(value = FLIP_OPT[0])
+        }
+        self.color_vars = {
+            'brightness': ctk.DoubleVar(value = BRIGHTNESS_DEFAULT),
+            'grayscale': ctk.BooleanVar(value=GRAYSCALE_DEFAULT),
+            'invert': ctk.BooleanVar(value=INVERT_DEFAULT),
+            'vibrance': ctk.DoubleVar(value = VIBRANCE_DEFAULT)
+        }
+        self.effect_vars = {
+            'blur': ctk.DoubleVar(value = BLUR_DEFAULT),
+            'contrast': ctk.IntVar(value= CONTRAST_DEFAULT),
+            'effect': ctk.StringVar(value= EFFECT_OPT[0])
         }
 
-        self.current_theme = "light"
+        #Tracing
+        combined_vars = list(self.pos_vars.values()) + list(self.color_vars.values()) + list(self.effect_vars.values())
+        
+        for var in combined_vars:
+            var.trace('w', self.manipulate_image)
 
-        self.container = Frame(root)
-        self.container.pack(fill="both", expand=True)
+    def manipulate_image(self, *args):
+        self.image = self.original
 
-        self.frames = {}
+        #Rotate
+        if self.pos_vars['rotate'].get() != ROTATE_DEFAULT:
+            self.image = self.image.rotate(self.pos_vars['rotate'].get())
 
-        for F in (HomeScreen, GalleryScreen, PhotoViewerScreen, SettingsScreen):
-            page_name = F.__name__
-            frame = F(parent=self.container, controller=self)
-            self.frames[page_name] = frame
-            frame.grid(row=0, column=0, sticky="nsew")
+        #Zoom
+        if self.pos_vars['zoom'].get() != ZOOM_DEFAULT:
+            self.image = ImageOps.crop(image = self.image, border= self.pos_vars['zoom'].get())
 
-        self.show_frame("HomeScreen")
+        #Flip
+        if self.pos_vars['flip'].get() != FLIP_OPT[0]:
+            if self.pos_vars['flip'].get() == 'X':
+                self.image = ImageOps.mirror(self.image)
+            if self.pos_vars['flip'].get() == 'Y':
+                self.image = ImageOps.flip(self.image)
+            if self.pos_vars['flip'].get() == 'Both':
+                self.image = ImageOps.mirror(self.image)
+                self.image = ImageOps.flip(self.image)
 
-    def show_frame(self, page_name):
-        frame = self.frames[page_name]
-        frame.update_theme()
-        frame.tkraise()
+        #Brightness / Vibrance
+        if self.color_vars['brightness'].get() != BRIGHTNESS_DEFAULT:
+            brightness_enhancer = ImageEnhance.Brightness(self.image)
+            self.image = brightness_enhancer.enhance(self.color_vars['brightness'].get())
 
-    def set_theme(self, theme_name):
-        if theme_name in self.themes:
-            self.current_theme = theme_name
-            for frame in self.frames.values():
-                frame.update_theme()
+        if self.color_vars['vibrance'].get() != VIBRANCE_DEFAULT:
+            vibrance_enhancer = ImageEnhance.Color(self.image)
+            self.image = vibrance_enhancer.enhance(self.color_vars['vibrance'].get())
 
-class ThemedFrame(Frame):
-    def __init__(self, parent, controller):
-        Frame.__init__(self, parent)
-        self.controller = controller
+        #Color
+        if self.color_vars['grayscale'].get():
+            self.image = ImageOps.grayscale(self.image)
+        if self.color_vars['invert'].get():
+            self.image = ImageOps.invert(self.image)
 
-    def update_theme(self):
-        theme = self.controller.themes[self.controller.current_theme]
-        self.configure(bg=theme["bg"])
-        for widget in self.winfo_children():
-            self.apply_theme(widget, theme)
+        #Blur & Contrast
+        if self.effect_vars['blur'].get() != BLUR_DEFAULT:
+            self.image = self.image.filter(ImageFilter.GaussianBlur(self.effect_vars['blur'].get()))
 
-    def apply_theme(self, widget, theme):
-        if isinstance(widget, (Label, Button, Frame)):
-            widget.configure(bg=theme.get("bg", "#f0f0f0"), fg=theme.get("fg", "black"))
-        if isinstance(widget, Button):
-            widget.configure(
-                bg=theme["button_bg"],
-                fg=theme["button_fg"],
-                activebackground="#0078d7",
-                activeforeground="white",
-                bd=0,
-                relief="flat",
-                cursor="hand2"
-            )
+        if self.effect_vars['contrast'].get() != CONTRAST_DEFAULT:
+            self.image = self.image.filter(ImageFilter.UnsharpMask(self.effect_vars['contrast'].get()))
 
-class HomeScreen(ThemedFrame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, controller)
+        match self.effect_vars['effect'].get():
+            case 'Emboss': self.image = self.image.filter(ImageFilter.EMBOSS)
+            case 'Find edges': self.image = self.image.filter(ImageFilter.FIND_EDGES)
+            case 'Contour': self.image = self.image.filter(ImageFilter.CONTOUR)
+            case 'Edge enhance': self.image = self.image.filter(ImageFilter.EDGE_ENHANCE_MORE)
 
-        Label(self, text="📸 Photo Gallery Application", font=("Arial", 24, "bold")).pack(pady=40)
-        Label(self, text="Welcome! Manage your photos easily.\nChoose an option below:", font=("Arial", 12)).pack(pady=10)
+        self.place_image()
 
-        Button(self, text="View Gallery", width=20, height=2,
-               command=lambda: controller.show_frame("GalleryScreen")).pack(pady=10)
-        Button(self, text="Open Photo Viewer", width=20, height=2,
-               command=lambda: controller.show_frame("PhotoViewerScreen")).pack(pady=10)
-        Button(self, text="Settings", width=20, height=2,
-               command=lambda: controller.show_frame("SettingsScreen")).pack(pady=10)
-        Button(self, text="Exit", width=20, height=2,
-               command=controller.root.quit).pack(pady=30)
+    def handle_import(self, path):
+        self.original = Image.open(path)
+        self.image = self.original
+        self.image_ratio = self.image.size[0] / self.image.size[1]
+        self.image_tk = ImageTk.PhotoImage(self.image)
 
-class GalleryScreen(ThemedFrame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, controller)
+        self.main_menu.grid_forget()
+        self.image_output = Import_Page(self, self.resize_image)
+        self.close_button = CloseButton(self, self.close_edit)
+        self.menu = Menu(self, self.pos_vars, self.color_vars, self.effect_vars, self.export_image)
 
-        Label(self, text="🖼️ Photo Gallery", font=("Arial", 20, "bold")).pack(pady=20)
-        Label(self, text="(Gallery grid will be displayed here)", font=("Arial", 12)).pack(pady=50)
+    def close_edit(self):
+        self.image_output.grid_forget()
+        self.close_button.place_forget()
+        self.menu.grid_forget()
 
-        Button(self, text="Back to Home", width=20,
-               command=lambda: controller.show_frame("HomeScreen")).pack(pady=10)
-        Button(self, text="Open Selected Photo", width=20,
-               command=lambda: controller.show_frame("PhotoViewerScreen")).pack(pady=10)
+        self.image_import = MainMenu(
+            master=self,
+            on_import=self.handle_import,
+            on_edit=self.handle_edit,
+            on_gallery=self.handle_gallery,
+            on_exit=self.handle_exit
+        )
 
-class PhotoViewerScreen(ThemedFrame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, controller)
+    def resize_image(self, event):
+        #Current canvas ratio
+        canvas_ratio = event.width / event.height
 
-        Label(self, text="🖼️ Photo Viewer", font=("Arial", 20, "bold")).pack(pady=20)
-        Label(self, text="(Selected photo will be displayed here)", font=("Arial", 12)).pack(pady=50)
+        #Update canvas sizes
+        self.canvas_width = event.width
+        self.canvas_height = event.height
+        
+        #Resize
+        if canvas_ratio > self.image_ratio:
+            self.image_height = int(event.height)
+            self.image_width = int(self.image_height * self.image_ratio)
+        else:
+            self.image_width = int(event.width)
+            self.image_height = int(self.image_width  / self.image_ratio)
 
-        Button(self, text="Back to Gallery", width=20,
-               command=lambda: controller.show_frame("GalleryScreen")).pack(pady=10)
-        Button(self, text="Back to Home", width=20,
-               command=lambda: controller.show_frame("HomeScreen")).pack(pady=10)
+        self.place_image()
 
-class SettingsScreen(ThemedFrame):
-    def __init__(self, parent, controller):
-        super().__init__(parent, controller)
+    def place_image(self):
+        self.image_output.delete('all')
+        resized_image = self.image.resize((self.image_width, self.image_height))
+        self.image_tk = ImageTk.PhotoImage(resized_image)
+        self.image_output.create_image(self.canvas_width / 2, self.canvas_height / 2, image = self.image_tk)
 
-        Label(self, text="⚙️ Settings", font=("Arial", 20, "bold")).pack(pady=30)
-        Label(self, text="Choose Theme:", font=("Arial", 12)).pack(pady=10)
+    def export_image(self, name, file):
+        directory = Path(__file__).resolve().parent
+        image_folder = directory / "photos"
+        image_folder.mkdir(exist_ok=True)
 
-        Button(self, text="☀️ Light Mode", width=20, height=2,
-               command=lambda: controller.set_theme("light")).pack(pady=10)
+        export_string = f'{image_folder}/{name}.{file}'
+        self.image.save(export_string)
+        self.close_edit()
 
-        Button(self, text="🌙 Dark Mode", width=20, height=2,
-               command=lambda: controller.set_theme("dark")).pack(pady=10)
+    def handle_edit(self):
+        print("Edit clicked")
 
-        Button(self, text="Back to Home", width=20, height=2,
-               command=lambda: controller.show_frame("HomeScreen")).pack(pady=30)
+    def handle_gallery(self):
+        print("Gallery clicked")
 
-root = Tk()
-app = Gallerie(root)
-root.mainloop()
+    def handle_exit(self):
+        self.destroy()
+
+Gallerie()
