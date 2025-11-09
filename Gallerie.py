@@ -1,13 +1,13 @@
-import customtkinter as ctk
+import customtkinter as ctk #using customtkinter for more customizability on ui, most if not all functions are the same as normal tkinter
 from pathlib import Path
 from Widgets import *
-from Menu import *
+from Edit import *
 from PIL import Image, ImageTk, ImageOps, ImageEnhance, ImageFilter
 import os
 import subprocess
 import sys
 
-# Enable HEIC support
+#turns on heic support
 try:
     from pillow_heif import register_heif_opener
     register_heif_opener()
@@ -25,7 +25,6 @@ class Gallerie(ctk.CTk):
         self.title("Gallerie")
         self.minsize(800, 500)
         
-        # Photos directory - Set this FIRST before anything else
         self.photos_dir = Path(__file__).resolve().parent / "photos"
         self.photos_dir.mkdir(exist_ok=True)
         
@@ -43,7 +42,6 @@ class Gallerie(ctk.CTk):
         self.canvas_width = 0
         self.canvas_height = 0
 
-        # Create and pack the menu
         self.main_menu = MainMenu(
             master=self,
             on_import=self.handle_import,
@@ -132,7 +130,7 @@ class Gallerie(ctk.CTk):
 
     def handle_import(self, path):
         self.original = Image.open(path)
-        # Convert RGBA to RGB if necessary
+        # Convert RGBA to RGB
         if self.original.mode == 'RGBA':
             rgb_image = Image.new('RGB', self.original.size, (255, 255, 255))
             rgb_image.paste(self.original, mask=self.original.split()[3])
@@ -142,7 +140,6 @@ class Gallerie(ctk.CTk):
         self.image_ratio = self.image.size[0] / self.image.size[1]
         self.image_tk = ImageTk.PhotoImage(self.image)
 
-        # Reset all parameters to default values
         self.reset_parameters()
 
         self.main_menu.grid_forget()
@@ -150,20 +147,20 @@ class Gallerie(ctk.CTk):
         self.close_button = CloseButton(self, self.close_edit)
         self.menu = Menu(self, self.pos_vars, self.color_vars, self.effect_vars, self.export_image)
 
+    #Resets all editing values
     def reset_parameters(self):
-        """Reset all editing parameters to their default values"""
-        # Reset position variables
+        #Reset position variables
         self.pos_vars['rotate'].set(ROTATE_DEFAULT)
         self.pos_vars['zoom'].set(ZOOM_DEFAULT)
         self.pos_vars['flip'].set(FLIP_OPT[0])
         
-        # Reset color variables
+        #Reset color variables
         self.color_vars['brightness'].set(BRIGHTNESS_DEFAULT)
         self.color_vars['grayscale'].set(GRAYSCALE_DEFAULT)
         self.color_vars['invert'].set(INVERT_DEFAULT)
         self.color_vars['vibrance'].set(VIBRANCE_DEFAULT)
         
-        # Reset effect variables
+        #Reset effect variables
         self.effect_vars['blur'].set(BLUR_DEFAULT)
         self.effect_vars['contrast'].set(CONTRAST_DEFAULT)
         self.effect_vars['effect'].set(EFFECT_OPT[0])
@@ -207,7 +204,7 @@ class Gallerie(ctk.CTk):
 
     def export_image(self, name, file):
         export_string = f'{self.photos_dir}/{name}.{file}'
-        # Convert RGBA to RGB for JPEG export
+        #Convert RGBA to RGB for JPEG export
         if file.lower() in ['jpg', 'jpeg'] and self.image.mode == 'RGBA':
             rgb_image = Image.new('RGB', self.image.size, (255, 255, 255))
             rgb_image.paste(self.image, mask=self.image.split()[3])
@@ -217,23 +214,18 @@ class Gallerie(ctk.CTk):
         self.close_edit()
 
     def handle_edit(self):
-        """Open the photo management page"""
         self.main_menu.grid_forget()
         self.photo_manager = PhotoManager(self, self.photos_dir, self.return_to_menu, self.edit_photo)
 
     def handle_gallery(self):
-        """Open the Pinterest-style gallery"""
         self.main_menu.grid_forget()
         self.gallery_view = GalleryView(self, self.photos_dir, self.return_to_menu)
 
     def return_to_menu(self):
-        """Return to main menu from any view"""
-        # Remove all possible views
         for widget in self.winfo_children():
             widget.grid_forget()
             widget.place_forget()
         
-        # Recreate main menu
         self.main_menu = MainMenu(
             master=self,
             on_import=self.handle_import,
@@ -243,15 +235,13 @@ class Gallerie(ctk.CTk):
         )
 
     def edit_photo(self, photo_path):
-        """Open a photo for editing"""
         self.handle_import(photo_path)
 
     def handle_exit(self):
         self.destroy()
 
-
+#Mangement page with photo preview
 class PhotoManager(ctk.CTkFrame):
-    """Photo management page with preview and full view"""
     def __init__(self, master, photos_dir, return_callback, edit_callback):
         super().__init__(master)
         self.grid(row=0, column=0, columnspan=2, sticky='nsew')
@@ -259,14 +249,11 @@ class PhotoManager(ctk.CTkFrame):
         self.return_callback = return_callback
         self.edit_callback = edit_callback
         self.selected_photo = None
-        # No need for photo_refs with CTkImage
 
-        # Configure layout
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
         self.columnconfigure(1, weight=2)
 
-        # Header with back button
         header = ctk.CTkFrame(self, fg_color='transparent')
         header.grid(row=0, column=0, columnspan=2, sticky='ew', padx=10, pady=10)
         
@@ -276,11 +263,11 @@ class PhotoManager(ctk.CTkFrame):
         title = ctk.CTkLabel(header, text="Manage Photos", font=("Arial", 24, "bold"))
         title.pack(side='left', padx=20)
 
-        # Left side - Thumbnail grid
+        #Grid for thumnails
         self.thumbnail_frame = ctk.CTkScrollableFrame(self, fg_color=DARK_GREY)
         self.thumbnail_frame.grid(row=1, column=0, sticky='nsew', padx=(10, 5), pady=10)
 
-        # Right side - Full preview and actions (scrollable)
+        #Full preview and vutton
         self.preview_frame = ctk.CTkScrollableFrame(self, fg_color=DARK_GREY)
         self.preview_frame.grid(row=1, column=1, sticky='nsew', padx=(5, 10), pady=10)
         
@@ -288,18 +275,14 @@ class PhotoManager(ctk.CTkFrame):
                                           font=("Arial", 16))
         self.preview_label.pack(expand=True, pady=50)
 
-        # Load photos
         self.load_thumbnails()
 
-    def load_thumbnails(self):
-        """Load all photos as thumbnails"""
-        # No need for photo_refs list anymore with CTkImage
-        
-        # Clear existing thumbnails
+    #Load thumbnail for photos
+    def load_thumbnails(self):        
         for widget in self.thumbnail_frame.winfo_children():
             widget.destroy()
 
-        # Get all image files
+        #Get all files
         image_files = []
         extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp']
         if HEIC_SUPPORT:
@@ -314,20 +297,18 @@ class PhotoManager(ctk.CTkFrame):
             no_photos.pack(pady=20)
             return
 
-        # Create thumbnail grid
         row, col = 0, 0
         max_cols = 3
 
         for img_path in image_files:
             try:
-                # Load and resize thumbnail
+                #Load & resize thumbnail
                 img = Image.open(img_path)
                 img.thumbnail((150, 150))
                 
-                # Use CTkImage for better scaling on HighDPI displays
                 ctk_photo = ctk.CTkImage(light_image=img, dark_image=img, size=(150, 150))
 
-                # Create thumbnail button
+                #Create button with thumbnail
                 btn_frame = ctk.CTkFrame(self.thumbnail_frame, fg_color='transparent')
                 btn_frame.grid(row=row, column=col, padx=5, pady=5)
 
@@ -336,7 +317,7 @@ class PhotoManager(ctk.CTkFrame):
                                    command=lambda p=img_path: self.show_full_image(p))
                 btn.pack()
 
-                # Photo name label
+                #Photo name
                 name_label = ctk.CTkLabel(btn_frame, text=img_path.name, 
                                          font=("Arial", 10))
                 name_label.pack()
@@ -350,40 +331,36 @@ class PhotoManager(ctk.CTkFrame):
                 print(f"Error loading {img_path}: {e}")
 
     def show_full_image(self, photo_path):
-        """Display full image with action buttons"""
         self.selected_photo = photo_path
 
-        # Clear preview frame
         for widget in self.preview_frame.winfo_children():
             widget.destroy()
 
         try:
-            # Load full image
+            #Load image
             img = Image.open(photo_path)
             
-            # Resize to fit preview area while maintaining aspect ratio
+            #Resize image with same ratio
             max_size = (600, 400)
             img.thumbnail(max_size)
             
-            # Use CTkImage for better scaling
             ctk_photo = ctk.CTkImage(light_image=img, dark_image=img, 
                                      size=(img.width, img.height))
 
-            # Display image
+            #Show image
             img_label = ctk.CTkLabel(self.preview_frame, image=ctk_photo, text="")
             img_label.pack(pady=20)
 
-            # Photo info
+            #hoto info
             info_text = f"Name: {photo_path.name}\nSize: {photo_path.stat().st_size / 1024:.1f} KB"
             info_label = ctk.CTkLabel(self.preview_frame, text=info_text, font=("Arial", 12))
             info_label.pack(pady=10)
 
-            # Action buttons
+            #buttons
             btn_frame = ctk.CTkFrame(self.preview_frame, fg_color='transparent')
             btn_frame.pack(pady=20)
 
-            edit_btn = ctk.CTkButton(btn_frame, text="Edit", width=120, height=40,
-                                    command=lambda: self.edit_callback(str(photo_path)))
+            edit_btn = ctk.CTkButton(btn_frame,text="Edit",width=120,height=40,command=lambda: self.edit_photo(photo_path))
             edit_btn.grid(row=0, column=0, padx=10)
 
             open_btn = ctk.CTkButton(btn_frame, text="Open File", width=120, height=40,
@@ -401,8 +378,13 @@ class PhotoManager(ctk.CTkFrame):
                                       font=("Arial", 14))
             error_label.pack(expand=True)
 
+    def edit_photo(self, photo_path):
+        #Hide the photo manager page when edit
+        self.grid_forget()
+        self.edit_callback(str(photo_path))
+
     def open_file(self, photo_path):
-        """Open the image file in the default system viewer"""
+        #Open image in os's image viewr
         try:
             if sys.platform == 'win32':
                 os.startfile(photo_path)
@@ -414,8 +396,7 @@ class PhotoManager(ctk.CTkFrame):
             print(f"Error opening file: {e}")
 
     def delete_photo(self, photo_path):
-        """Delete the selected photo"""
-        # Confirm deletion
+        # Confirm delete
         confirm_window = ctk.CTkToplevel(self)
         confirm_window.title("Confirm Delete")
         confirm_window.geometry("300x150")
@@ -435,7 +416,7 @@ class PhotoManager(ctk.CTkFrame):
                 confirm_window.destroy()
                 self.load_thumbnails()
                 
-                # Clear preview
+                #Clears preview
                 for widget in self.preview_frame.winfo_children():
                     widget.destroy()
                 self.preview_label = ctk.CTkLabel(self.preview_frame, 
@@ -454,21 +435,17 @@ class PhotoManager(ctk.CTkFrame):
                               command=confirm_window.destroy)
         no_btn.pack(side='left', padx=10)
 
-
+#Class for Pinterest like gallery
 class GalleryView(ctk.CTkFrame):
-    """Pinterest-style gallery view"""
     def __init__(self, master, photos_dir, return_callback):
         super().__init__(master)
         self.grid(row=0, column=0, columnspan=2, sticky='nsew')
         self.photos_dir = photos_dir
         self.return_callback = return_callback
-        # No need for photo_refs with CTkImage
 
-        # Configure layout
         self.rowconfigure(1, weight=1)
         self.columnconfigure(0, weight=1)
 
-        # Header
         header = ctk.CTkFrame(self, fg_color='transparent')
         header.grid(row=0, column=0, sticky='ew', padx=10, pady=10)
         
@@ -478,18 +455,14 @@ class GalleryView(ctk.CTkFrame):
         title = ctk.CTkLabel(header, text="Gallery", font=("Arial", 24, "bold"))
         title.pack(side='left', padx=20)
 
-        # Scrollable gallery frame
         self.gallery_frame = ctk.CTkScrollableFrame(self, fg_color=BACKGROUND_COLOR)
         self.gallery_frame.grid(row=1, column=0, sticky='nsew', padx=10, pady=10)
 
-        # Load gallery
         self.load_gallery()
 
+    #Loads all photos for gallery
     def load_gallery(self):
-        """Load photos in a Pinterest-style masonry layout"""
-        # No need for photo_refs list anymore with CTkImage
-
-        # Get all image files
+        #Get all image files
         image_files = []
         extensions = ['*.jpg', '*.jpeg', '*.png', '*.gif', '*.bmp']
         if HEIC_SUPPORT:
@@ -504,7 +477,6 @@ class GalleryView(ctk.CTkFrame):
             no_photos.pack(pady=50)
             return
 
-        # Create columns for masonry layout
         num_columns = 4
         columns = [ctk.CTkFrame(self.gallery_frame, fg_color='transparent') 
                    for _ in range(num_columns)]
@@ -513,36 +485,35 @@ class GalleryView(ctk.CTkFrame):
             col.grid(row=0, column=i, sticky='nsew', padx=5)
             self.gallery_frame.columnconfigure(i, weight=1, uniform='gallery')
 
-        # Distribute images across columns
         for idx, img_path in enumerate(image_files):
             try:
-                # Load image
+                #Load image
                 img = Image.open(img_path)
                 
-                # Calculate thumbnail size while maintaining aspect ratio
+                #Get thumbnail size with same size ratio
                 base_width = 220
                 w_percent = base_width / float(img.size[0])
                 h_size = int(float(img.size[1]) * w_percent)
                 img = img.resize((base_width, h_size), Image.Resampling.LANCZOS)
                 
-                # Use CTkImage for better scaling
+                #Use CTkImage for better scaling
                 ctk_photo = ctk.CTkImage(light_image=img, dark_image=img, 
                                          size=(base_width, h_size))
 
-                # Determine which column to add to (round-robin)
+                #Determine which column to add to (round-robin)
                 col_idx = idx % num_columns
 
-                # Create card
+                #Create card
                 card = ctk.CTkFrame(columns[col_idx], fg_color=DARK_GREY, corner_radius=10)
                 card.pack(pady=8, fill='x')
 
-                # Image button
+                #Image button
                 btn = ctk.CTkButton(card, image=ctk_photo, text="", 
                                    fg_color='transparent', hover_color=GREY,
                                    command=lambda p=img_path: self.open_fullscreen(p))
                 btn.pack(padx=5, pady=5)
 
-                # Photo name
+                #Photo name
                 name_label = ctk.CTkLabel(card, text=img_path.stem, 
                                          font=("Arial", 11, "bold"))
                 name_label.pack(padx=10, pady=(0, 10))
@@ -550,8 +521,8 @@ class GalleryView(ctk.CTkFrame):
             except Exception as e:
                 print(f"Error loading {img_path}: {e}")
 
+    #Opens the full image in a new window
     def open_fullscreen(self, photo_path):
-        """Open photo in fullscreen view"""
         fullscreen_window = ctk.CTkToplevel(self)
         fullscreen_window.title(photo_path.name)
         fullscreen_window.geometry("800x600")
