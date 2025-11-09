@@ -19,7 +19,7 @@ class MainMenu(ctk.CTkFrame):
         import_btn = ctk.CTkButton(self, text="Import", width = 200, height = 50, font=("Arial", 18), command=self.open_dialog)
         import_btn.pack(expand = True)
 
-        edit_btn = ctk.CTkButton(self, text="Edit", width = 200, height = 50, font=("Arial", 18), command=on_edit)
+        edit_btn = ctk.CTkButton(self, text="Manage", width = 200, height = 50, font=("Arial", 18), command=on_edit)
         edit_btn.pack(expand = True)
 
         gallery_btn = ctk.CTkButton(self, text="Gallery", width = 200, height = 50, font=("Arial", 18), command=on_gallery)
